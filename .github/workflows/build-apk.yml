@@ -82,6 +82,18 @@ jobs:
               <foreground android:drawable="@drawable/ic_homebulkup_foreground"/>
           </adaptive-icon>
           EOF
+      - name: Register launcher icon in Android manifest
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('app/src/main/AndroidManifest.xml')
+          s = p.read_text()
+          s2 = s.replace('<application ', '<application android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" ', 1)
+          if s2 == s and 'android:icon="@mipmap/ic_launcher"' not in s:
+              raise SystemExit('Could not register launcher icon in manifest')
+          p.write_text(s2)
+          print('Launcher icon registered in AndroidManifest.xml')
+          PY
       - name: Inspect complete workout screen for timer placement
         run: |
           python3 - <<'PY'
