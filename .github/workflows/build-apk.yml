@@ -75,20 +75,22 @@ jobs:
           from pathlib import Path
           p = Path('app/src/main/java/kr/co/homebulkup/MainActivity.kt')
           s = p.read_text()
-          start = s.find('                    OutlinedButton(onClick = timer, modifier = Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 8.dp), colors = ButtonDefaults.outlinedButtonColors(contentColor = Lime)) {')
+          marker = '                    OutlinedButton(onClick = timer, modifier = Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 8.dp), colors = ButtonDefaults.outlinedButtonColors(contentColor = Lime)) {'
+          start = s.find(marker)
           if start < 0:
               raise SystemExit('Could not find per-set timer button')
-          end = s.find('                    }', start)
+          end = s.find('\n                    }', start)
           if end < 0:
               raise SystemExit('Could not find end of per-set timer button')
-          end += len('                    }')
+          end += len('\n                    }')
           s = s[:start] + s[end:]
-          old = '''                val priorSet = (0 until exercise.sets).map { setNo ->
-                    val suffix = "-$selected-$idx-set-${setNo+1}-weight"
-                    logs.entries.filter { it.key.endsWith(suffix) && !it.key.startsWith(dateKey) }
-                        .maxByOrNull { it.key.substringBefore(suffix) }?.value.orEmpty()
-                }'''
-          new = '''                val priorSet = remember(logs, selected, idx, dateKey, exercise.sets) {
+          start = s.find('                val priorSet = ')
+          if start < 0:
+              raise SystemExit('Could not find prior-set lookup')
+          end = s.find('\n                if (priorSet.any', start)
+          if end < 0:
+              raise SystemExit('Could not find end of prior-set lookup')
+          block = '''                val priorSet = remember(logs, selected, idx, dateKey, exercise.sets) {
                     (0 until exercise.sets).map { setNo ->
                         val suffix = "-$selected-$idx-set-${setNo+1}-weight"
                         logs.entries.asSequence()
@@ -96,11 +98,9 @@ jobs:
                             .maxByOrNull { it.key.substringBefore(suffix) }?.value.orEmpty()
                     }
                 }'''
-          if s.count(old) != 1:
-              raise SystemExit('Could not find prior-set lookup block; refusing unsafe patch')
-          s = s.replace(old, new, 1)
+          s = s[:start] + block + s[end:]
           p.write_text(s)
-          print('Removed redundant per-set full-width timer buttons (shared timer remains) and memoized prior-set lookup.')
+          print('Removed repeated per-set timer buttons and memoized previous-set lookup.')
           PY
       - name: Optimize workout list item reuse for smoother scrolling
         run: |
