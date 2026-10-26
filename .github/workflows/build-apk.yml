@@ -23,6 +23,20 @@ jobs:
           unzip -o HomeBulkUp_Project.zip -d /tmp/homebulkup-source
           cp -a /tmp/homebulkup-source/HomeBulkUp/. .
           test -f app/src/main/java/kr/co/homebulkup/MainActivity.kt
+      - name: Inspect workout timer code
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('app/src/main/java/kr/co/homebulkup/MainActivity.kt')
+          lines = p.read_text().splitlines()
+          keys = ('휴식', '타이머', 'restTimer', 'RestTimer', 'rest timer', 'Rest timer')
+          hits = [i for i, line in enumerate(lines) if any(k.lower() in line.lower() for k in keys)]
+          print('MainActivity.kt line count:', len(lines))
+          for i in hits:
+              print(f'--- context {max(1, i-5)}-{min(len(lines), i+7)} ---')
+              for j in range(max(0, i-6), min(len(lines), i+7)):
+                  print(f'{j+1}: {lines[j]}')
+          PY
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
