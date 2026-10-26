@@ -204,34 +204,51 @@ jobs:
       - name: Measure scroll frame performance on Android emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 35
+          api-level: 30
           arch: x86_64
-          profile: pixel_6
+          profile: pixel_2
           disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           script: |
+            set -e
             adb wait-for-device
             adb shell 'while [ "$(getprop sys.boot_completed)" != "1" ]; do sleep 2; done'
+            adb shell input keyevent 82 || true
             adb install -r app/build/outputs/apk/debug/app-debug.apk
+            adb logcat -c
             adb shell monkey -p kr.co.homebulkup 1
-            sleep 15
+            sleep 12
+            echo "--- PACKAGE / PROCESS CHECK ---"
+            adb shell pm list packages | grep kr.co.homebulkup
+            adb shell pidof kr.co.homebulkup || true
             adb shell dumpsys gfxinfo kr.co.homebulkup reset
-            adb shell input swipe 540 1750 540 450 450
-            adb shell input swipe 540 450 540 1750 450
-            adb shell input swipe 540 1750 540 450 450
-            adb shell input swipe 540 450 540 1750 450
-            adb shell input swipe 540 1750 540 450 450
-            adb shell input swipe 540 450 540 1750 450
-            adb shell input swipe 540 1750 540 450 450
-            adb shell input swipe 540 450 540 1750 450
+            adb shell input swipe 540 1500 540 500 450
+            adb shell input swipe 540 500 540 1500 450
+            adb shell input swipe 540 1500 540 500 450
+            adb shell input swipe 540 500 540 1500 450
+            adb shell input swipe 540 1500 540 500 450
+            adb shell input swipe 540 500 540 1500 450
             adb shell dumpsys gfxinfo kr.co.homebulkup > scroll-gfxinfo-summary.txt
             adb shell dumpsys gfxinfo kr.co.homebulkup framestats > scroll-gfxinfo-framestats.txt
+            adb logcat -d -t 2500 > scroll-logcat.txt
             echo "--- GFXINFO SUMMARY ---"
             cat scroll-gfxinfo-summary.txt
             echo "--- FRAMESTATS HEADER / SAMPLE ---"
             head -n 45 scroll-gfxinfo-framestats.txt
             echo "--- VALIDATING FRAME METRICS ---"
             grep -E 'Total frames rendered|Janky frames:' scroll-gfxinfo-summary.txt
-            test -s scroll-gfxinfo-framestats.txt
+            grep -q 'PROFILEDATA' scroll-gfxinfo-framestats.txt
+      - name: Upload raw scroll performance data
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: home-bulk-up-scroll-frame-data
+          path: |
+            scroll-gfxinfo-summary.txt
+            scroll-gfxinfo-framestats.txt
+            scroll-logcat.txt
+          if-no-files-found: warn
+          retention-days: 30
       - name: Upload raw scroll performance data
         if: always()
         uses: actions/upload-artifact@v4
