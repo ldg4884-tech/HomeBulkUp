@@ -208,7 +208,8 @@ jobs:
           arch: x86_64
           profile: pixel_2
           disable-animations: true
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-snapshot -wipe-data
+          emulator-boot-timeout: 600
           script: |
             set -e
             adb wait-for-device
@@ -247,16 +248,6 @@ jobs:
             scroll-gfxinfo-summary.txt
             scroll-gfxinfo-framestats.txt
             scroll-logcat.txt
-          if-no-files-found: warn
-          retention-days: 30
-      - name: Upload raw scroll performance data
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: home-bulk-up-scroll-frame-data
-          path: |
-            scroll-gfxinfo-summary.txt
-            scroll-gfxinfo-framestats.txt
           if-no-files-found: warn
           retention-days: 30
       - name: Upload APK
