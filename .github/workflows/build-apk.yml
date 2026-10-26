@@ -30,7 +30,8 @@ jobs:
           p = Path('app/src/main/java/kr/co/homebulkup/MainActivity.kt')
           source = p.read_text()
           anchor = '                    }\n                }\n            }\n        }\n        item { Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) { OutlinedButton(onClick = timer'
-          replacement = '                    }\n                    OutlinedButton(onClick = timer, modifier = Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 8.dp), colors = ButtonDefaults.outlinedButtonColors(contentColor = Lime)) {\n                        Icon(Icons.Default.Timer, null)\n                        Spacer(Modifier.width(8.dp))\n                        Text("$setNo 세트 휴식 타이머", fontWeight = FontWeight.Bold)\n                    }\n                }\n            }\n        }\n        item { Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) { OutlinedButton(onClick = timer      - name: Create modern HomeBulkUp launcher icon
+          replacement = '                    }\n                    OutlinedButton(onClick = timer, modifier = Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 8.dp), colors = ButtonDefaults.outlinedButtonColors(contentColor = Lime)) {\n                        Icon(Icons.Default.Timer, null)\n                        Spacer(Modifier.width(8.dp))\n                        Text("$setNo 세트 휴식 타이머", fontWeight = FontWeight.Bold)\n                    }\n                }\n            }\n        }\n        item { Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) { OutlinedButton(onClick = timer
+      - name: Create modern HomeBulkUp launcher icon
         run: |
           mkdir -p app/src/main/res/drawable app/src/main/res/mipmap-anydpi-v26 app/src/main/res/values
           cat > app/src/main/res/drawable/ic_homebulkup_foreground.xml <<'EOF'
