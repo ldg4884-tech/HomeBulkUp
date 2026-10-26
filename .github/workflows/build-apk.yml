@@ -47,7 +47,7 @@ jobs:
               '                    }',
           ]
           lines[insert_at:insert_at] = button
-          p.write_text('\\n'.join(lines) + '\\n')
+          p.write_text('\n'.join(lines) + '\n')
           print('Added a full-width rest-timer button after each set input row.')
           PY
       - name: Create modern HomeBulkUp launcher icon
