@@ -210,11 +210,10 @@ jobs:
           disable-animations: true
           script: |
             adb wait-for-device
-            sleep 45
-            adb shell getprop sys.boot_completed
+            adb shell 'while [ "$(getprop sys.boot_completed)" != "1" ]; do sleep 2; done'
             adb install -r app/build/outputs/apk/debug/app-debug.apk
             adb shell monkey -p kr.co.homebulkup 1
-            sleep 10
+            sleep 15
             adb shell dumpsys gfxinfo kr.co.homebulkup reset
             adb shell input swipe 540 1750 540 450 450
             adb shell input swipe 540 450 540 1750 450
@@ -224,9 +223,25 @@ jobs:
             adb shell input swipe 540 450 540 1750 450
             adb shell input swipe 540 1750 540 450 450
             adb shell input swipe 540 450 540 1750 450
-            adb shell dumpsys gfxinfo kr.co.homebulkup > scroll-gfxinfo.txt
-            grep -E 'Total frames rendered|Janky frames:|90th percentile:|95th percentile:|99th percentile:' scroll-gfxinfo.txt || true
-            echo "--- RAW GFXINFO SAVED AS scroll-gfxinfo.txt ---"
+            adb shell dumpsys gfxinfo kr.co.homebulkup > scroll-gfxinfo-summary.txt
+            adb shell dumpsys gfxinfo kr.co.homebulkup framestats > scroll-gfxinfo-framestats.txt
+            echo "--- GFXINFO SUMMARY ---"
+            cat scroll-gfxinfo-summary.txt
+            echo "--- FRAMESTATS HEADER / SAMPLE ---"
+            head -n 45 scroll-gfxinfo-framestats.txt
+            echo "--- VALIDATING FRAME METRICS ---"
+            grep -E 'Total frames rendered|Janky frames:' scroll-gfxinfo-summary.txt
+            test -s scroll-gfxinfo-framestats.txt
+      - name: Upload raw scroll performance data
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: home-bulk-up-scroll-frame-data
+          path: |
+            scroll-gfxinfo-summary.txt
+            scroll-gfxinfo-framestats.txt
+          if-no-files-found: warn
+          retention-days: 30
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
