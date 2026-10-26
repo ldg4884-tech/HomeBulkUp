@@ -50,6 +50,25 @@ jobs:
           p.write_text('\n'.join(lines) + '\n')
           print('Added a full-width rest-timer button after each set input row.')
           PY
+      - name: Debounce workout log persistence to reduce typing stutter
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('app/src/main/java/kr/co/homebulkup/MainActivity.kt')
+          s = p.read_text()
+          anchor = '    var logs by remember(dateKey) { mutableStateOf(loadExerciseLogs(prefs)) }'
+          if s.count(anchor) != 1:
+              raise SystemExit('Expected one workout log state declaration; refusing unsafe patch')
+          effect = anchor + '\n    LaunchedEffect(logs, dateKey) {\n        delay(350)\n        saveExerciseLogs(prefs, logs)\n    }'
+          s = s.replace(anchor, effect, 1)
+          old = '                            saveExerciseLogs(prefs, logs)\n'
+          count = s.count(old)
+          if count != 2:
+              raise SystemExit(f'Expected two per-keystroke saves, found {count}; refusing unsafe patch')
+          s = s.replace(old, '', 2)
+          p.write_text(s)
+          print('Workout log persistence is now debounced; input changes no longer serialize and save the entire log map on every keystroke.')
+          PY
       - name: Optimize workout list item reuse for smoother scrolling
         run: |
           python3 - <<'PY'
