@@ -28,9 +28,28 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           p = Path('app/src/main/java/kr/co/homebulkup/MainActivity.kt')
-          source = p.read_text()
-          anchor = '                    }\n                }\n            }\n        }\n        item { Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) { OutlinedButton(onClick = timer'
-          replacement = '                    }\n                    OutlinedButton(onClick = timer, modifier = Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 8.dp), colors = ButtonDefaults.outlinedButtonColors(contentColor = Lime)) {\n                        Icon(Icons.Default.Timer, null)\n                        Spacer(Modifier.width(8.dp))\n                        Text("$setNo 세트 휴식 타이머", fontWeight = FontWeight.Bold)\n                    }\n                }\n            }\n        }\n        item { Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) { OutlinedButton(onClick = timer
+          lines = p.read_text().splitlines()
+          target = next((i for i, line in enumerate(lines) if 'OutlinedTextField(value = setReps' in line), None)
+          if target is None:
+              raise SystemExit('Could not find set repetition field')
+          insert_at = None
+          for i in range(target + 1, len(lines) - 1):
+              if lines[i].strip() == '}' and lines[i + 1].strip() == '}':
+                  insert_at = i + 1
+                  break
+          if insert_at is None:
+              raise SystemExit('Could not find end of set input row')
+          button = [
+              '                    OutlinedButton(onClick = timer, modifier = Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 8.dp), colors = ButtonDefaults.outlinedButtonColors(contentColor = Lime)) {',
+              '                        Icon(Icons.Default.Timer, null)',
+              '                        Spacer(Modifier.width(8.dp))',
+              '                        Text("$setNo 세트 휴식 타이머", fontWeight = FontWeight.Bold)',
+              '                    }',
+          ]
+          lines[insert_at:insert_at] = button
+          p.write_text('\\n'.join(lines) + '\\n')
+          print('Added a full-width rest-timer button after each set input row.')
+          PY
       - name: Create modern HomeBulkUp launcher icon
         run: |
           mkdir -p app/src/main/res/drawable app/src/main/res/mipmap-anydpi-v26 app/src/main/res/values
