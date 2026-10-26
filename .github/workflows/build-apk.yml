@@ -50,6 +50,21 @@ jobs:
           p.write_text('\n'.join(lines) + '\n')
           print('Added a full-width rest-timer button after each set input row.')
           PY
+      - name: Optimize workout list item reuse for smoother scrolling
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('app/src/main/java/kr/co/homebulkup/MainActivity.kt')
+          s = p.read_text()
+          old = 'itemsIndexed(day.exercises) { idx, exercise ->'
+          new = 'itemsIndexed(day.exercises, key = { index, _ -> "${selected}-exercise-${index}" }, contentType = { _, _ -> "workout-exercise" }) { idx, exercise ->'
+          count = s.count(old)
+          if count != 1:
+              raise SystemExit(f'Expected one workout list declaration, found {count}; refusing unsafe patch')
+          s = s.replace(old, new, 1)
+          p.write_text(s)
+          print('Workout exercises now have stable item keys and a shared content type.')
+          PY
       - name: Create modern HomeBulkUp launcher icon
         run: |
           mkdir -p app/src/main/res/drawable app/src/main/res/mipmap-anydpi-v26 app/src/main/res/values
