@@ -102,22 +102,6 @@ jobs:
           p.write_text(s)
           print('Removed repeated per-set timer buttons and memoized previous-set lookup.')
           PY
-      - name: Prevent one-second timer ticks from invalidating the entire app screen
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          p = Path('app/src/main/java/kr/co/homebulkup/MainActivity.kt')
-          s = p.read_text()
-          # Timer updates should only redraw the timer dialog, not repeatedly invalidate the workout list.
-          old = '    var timerRemaining by remember { mutableStateOf(90) }'
-          new = '    var timerRemaining by remember { mutableIntStateOf(90) }'
-          if s.count(old) != 1:
-              raise SystemExit('Could not find timerRemaining state')
-          s = s.replace(old, new, 1)
-          # Avoid accidental broad animation costs if the root content currently enables them.
-          p.write_text(s)
-          print('Switched the per-second countdown state to the primitive Compose state holder.')
-          PY
       - name: Optimize workout list item reuse for smoother scrolling
         run: |
           python3 - <<'PY'
