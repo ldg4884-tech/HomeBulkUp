@@ -201,6 +201,15 @@ jobs:
         run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
       - name: Build debug APK
         run: gradle --no-daemon assembleDebug
+      - name: Free disk space before creating Android emulator
+        run: |
+          echo "--- Disk usage before cleanup ---"
+          df -h /
+          du -sh ~/.gradle/caches ~/.gradle/wrapper/dists /usr/local/lib/android/sdk/ndk /usr/local/lib/android/sdk/cmake 2>/dev/null || true
+          rm -rf ~/.gradle/caches ~/.gradle/wrapper/dists
+          rm -rf /usr/local/lib/android/sdk/ndk /usr/local/lib/android/sdk/cmake
+          echo "--- Disk usage after cleanup ---"
+          df -h /
       - name: Measure scroll frame performance on Android emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
