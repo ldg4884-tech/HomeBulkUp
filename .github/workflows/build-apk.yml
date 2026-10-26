@@ -94,6 +94,19 @@ jobs:
           p.write_text(s2)
           print('Launcher icon registered in AndroidManifest.xml')
           PY
+      - name: Analyze Compose scrolling and recomposition hotspots
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('app/src/main/java/kr/co/homebulkup/MainActivity.kt')
+          s = p.read_text()
+          terms = ('verticalScroll', 'rememberScrollState', 'LazyColumn', 'Column(', 'mutableStateOf', 'LaunchedEffect', 'Timer')
+          print('--- Compose performance audit ---')
+          for i, line in enumerate(s.splitlines(), 1):
+              if any(term in line for term in terms):
+                  print(f'{i}: {line.strip()}')
+          print('--- End audit ---')
+          PY
       - name: Inspect complete workout screen for timer placement
         run: |
           python3 - <<'PY'
