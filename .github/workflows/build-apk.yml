@@ -229,7 +229,7 @@ jobs:
             import re, sys
             text = Path('scroll-gfxinfo.txt').read_text(errors='replace')
             print('--- FRAME PERFORMANCE SUMMARY ---')
-            for label, pattern in [('total_frames', r'Janky frames:\\s*\\d+'), ('janky_frames', r'Janky frames:\\s*(\\d+)\\s*\\('), ('percentile_90', r'90th percentile:\\s*([\\d.]+)ms'), ('percentile_95', r'95th percentile:\\s*([\\d.]+)ms'), ('percentile_99', r'99th percentile:\\s*([\\d.]+)ms')]:
+            for label, pattern in [('total_frames', r'Janky frames:\s*\d+'), ('janky_frames', r'Janky frames:\s*(\d+)\s*\('), ('percentile_90', r'90th percentile:\s*([\d.]+)ms'), ('percentile_95', r'95th percentile:\s*([\d.]+)ms'), ('percentile_99', r'99th percentile:\s*([\d.]+)ms')]:
                 m = re.search(pattern, text)
                 print(f'{label}={m.group(1) if m and m.lastindex else (m.group(0) if m else "not reported")}')
             if 'Total frames rendered' not in text and 'Janky frames:' not in text:
