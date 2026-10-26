@@ -174,14 +174,24 @@ jobs:
                   print(f'{i}: {line.strip()}')
           print('--- End audit ---')
           PY
-      - name: Inspect complete workout screen for timer placement
+      - name: Inspect workout list state and composition boundaries
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          p = Path('app/src/main/java/kr/co/homebulkup/MainActivity.kt')
-          lines = p.read_text().splitlines()
-          for i in range(177, min(230, len(lines))):
-              print(f'{i+1}: {lines[i]}')
+          lines = Path('app/src/main/java/kr/co/homebulkup/MainActivity.kt').read_text().splitlines()
+          needles = ('fun WorkoutScreen', 'fun HomeScreen', 'var timer', 'timerRemaining', 'LaunchedEffect', 'itemsIndexed(day.exercises', 'var logs by remember', 'var selected by remember')
+          hits = [i for i, line in enumerate(lines) if any(n in line for n in needles)]
+          ranges = []
+          for i in hits:
+              lo, hi = max(0, i-5), min(len(lines), i+9)
+              if ranges and lo <= ranges[-1][1]:
+                  ranges[-1] = (ranges[-1][0], max(ranges[-1][1], hi))
+              else:
+                  ranges.append((lo, hi))
+          for lo, hi in ranges:
+              print(f'--- MainActivity.kt lines {lo+1}-{hi} ---')
+              for i in range(lo, hi):
+                  print(f'{i+1}: {lines[i]}')
           PY
       - name: Set up JDK 17
         uses: actions/setup-java@v4
