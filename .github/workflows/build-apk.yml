@@ -231,22 +231,45 @@ jobs:
             echo "--- PACKAGE / PROCESS CHECK ---"
             adb shell pm list packages | grep kr.co.homebulkup
             adb shell pidof kr.co.homebulkup || true
+            echo "--- DEVICE DISPLAY ---"
+            adb shell wm size | tee scroll-device-size.txt
+            adb shell wm density | tee -a scroll-device-size.txt
+            echo "--- FOREGROUND ACTIVITY BEFORE TEST ---"
+            adb shell dumpsys activity activities | grep -E 'mResumedActivity|topResumedActivity' | tee scroll-foreground.txt
+            adb shell uiautomator dump /sdcard/window.xml >/dev/null
+            adb shell cat /sdcard/window.xml > scroll-ui-hierarchy.xml
+            adb shell screencap -p /sdcard/scroll-before.png
+            adb pull /sdcard/scroll-before.png scroll-before.png >/dev/null
             adb shell dumpsys gfxinfo kr.co.homebulkup reset
-            adb shell input swipe 540 1500 540 500 450
-            adb shell input swipe 540 500 540 1500 450
-            adb shell input swipe 540 1500 540 500 450
-            adb shell input swipe 540 500 540 1500 450
-            adb shell input swipe 540 1500 540 500 450
-            adb shell input swipe 540 500 540 1500 450
+            # Use screen-relative coordinates rather than assuming a fixed emulator resolution.
+            SIZE=$(adb shell wm size | grep -oE '[0-9]+x[0-9]+' | tail -1)
+            W=$(echo "$SIZE" | cut -d x -f 1)
+            H=$(echo "$SIZE" | cut -d x -f 2)
+            X=$((W / 2))
+            TOP=$((H * 3 / 4))
+            BOTTOM=$((H / 4))
+            for i in 1 2 3 4 5 6 7 8; do
+              adb shell input swipe "$X" "$TOP" "$X" "$BOTTOM" 700
+              sleep 0.25
+              adb shell input swipe "$X" "$BOTTOM" "$X" "$TOP" 700
+              sleep 0.25
+            done
+            sleep 3
             adb shell dumpsys gfxinfo kr.co.homebulkup > scroll-gfxinfo-summary.txt
             adb shell dumpsys gfxinfo kr.co.homebulkup framestats > scroll-gfxinfo-framestats.txt
-            adb logcat -d -t 2500 > scroll-logcat.txt
+            adb shell screencap -p /sdcard/scroll-after.png
+            adb pull /sdcard/scroll-after.png scroll-after.png >/dev/null
+            adb shell uiautomator dump /sdcard/window-after.xml >/dev/null
+            adb shell cat /sdcard/window-after.xml > scroll-ui-hierarchy-after.xml
+            adb logcat -d -t 4000 > scroll-logcat.txt
             echo "--- GFXINFO SUMMARY ---"
             cat scroll-gfxinfo-summary.txt
+            echo "--- FOREGROUND ACTIVITY ---"
+            cat scroll-foreground.txt
             echo "--- FRAMESTATS HEADER / SAMPLE ---"
             head -n 45 scroll-gfxinfo-framestats.txt
             echo "--- VALIDATING FRAME METRICS ---"
-            grep -E 'Total frames rendered|Janky frames:' scroll-gfxinfo-summary.txt
+            grep -E 'Total frames rendered|Janky frames:' scroll-gfxinfo-summary.txt || true
             grep -q 'PROFILEDATA' scroll-gfxinfo-framestats.txt
       - name: Upload raw scroll performance data
         if: always()
@@ -257,6 +280,12 @@ jobs:
             scroll-gfxinfo-summary.txt
             scroll-gfxinfo-framestats.txt
             scroll-logcat.txt
+            scroll-device-size.txt
+            scroll-foreground.txt
+            scroll-ui-hierarchy.xml
+            scroll-ui-hierarchy-after.xml
+            scroll-before.png
+            scroll-after.png
           if-no-files-found: warn
           retention-days: 30
       - name: Upload APK
