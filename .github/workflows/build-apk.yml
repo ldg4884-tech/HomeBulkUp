@@ -209,7 +209,9 @@ jobs:
           profile: pixel_6
           disable-animations: true
           script: |
-            set -euo pipefail
+            set -eu
+            adb wait-for-device
+            adb shell 'while [ "$(getprop sys.boot_completed)" != "1" ]; do sleep 2; done'
             adb install -r app/build/outputs/apk/debug/app-debug.apk
             adb shell monkey -p kr.co.homebulkup 1
             sleep 8
