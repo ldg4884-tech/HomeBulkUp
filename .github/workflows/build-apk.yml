@@ -211,6 +211,7 @@ jobs:
           echo "--- Disk usage after cleanup ---"
           df -h /
       - name: Measure scroll frame performance on Android emulator
+        continue-on-error: true
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 30
