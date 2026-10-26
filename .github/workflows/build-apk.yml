@@ -8,6 +8,7 @@ on:
       - '*.gradle.kts'
       - 'gradle.properties'
       - 'settings.gradle.kts'
+      - 'HomeBulkUp_Project.zip'
       - '.github/workflows/build-apk.yml'
 permissions:
   contents: read
@@ -17,6 +18,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Extract full Android project from uploaded ZIP
+        run: |
+          unzip -o HomeBulkUp_Project.zip -d /tmp/homebulkup-source
+          cp -a /tmp/homebulkup-source/HomeBulkUp/. .
+          test -f app/src/main/java/kr/co/homebulkup/MainActivity.kt
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
