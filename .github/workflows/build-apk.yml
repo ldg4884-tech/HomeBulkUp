@@ -633,15 +633,15 @@ jobs:
           p = Path('app/src/main/java/kr/co/homebulkup/MainActivity.kt')
           s = p.read_text()
           anchor = '''    LaunchedEffect(logs, dateKey) {
-          delay(350)
-          saveExerciseLogs(prefs, logs)
-      }
-      LazyColumn'''
+        delay(350)
+        saveExerciseLogs(prefs, logs)
+    }
+    LazyColumn'''
           replacement = '''    LaunchedEffect(logs, dateKey) {
-          delay(350)
-          saveExerciseLogs(prefs, logs)
-      }
-      val loggedSetCount = (0 until day.exercises.size).sumOf { idx ->
+        delay(350)
+        saveExerciseLogs(prefs, logs)
+    }
+    val loggedSetCount = (0 until day.exercises.size).sumOf { idx ->
           (1..day.exercises[idx].sets).count { setNo ->
               !logs["$dateKey-$selected-$idx-set-$setNo-weight"].isNullOrBlank() &&
               !logs["$dateKey-$selected-$idx-set-$setNo-reps"].isNullOrBlank()
