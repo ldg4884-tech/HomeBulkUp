@@ -572,24 +572,17 @@ jobs:
           from pathlib import Path
           p = Path('app/src/main/java/kr/co/homebulkup/MainActivity.kt')
           s = p.read_text()
-          anchor = '''                    }
-
-                }
-            }
-          }
-          item { Row(horizontalArrangement = Arrangement.spacedBy(10.dp))'''
-          button = '''                    }
+          rep = s.index('repeat(exercise.sets) { setIndex ->')
+          close = s.index('\\n                    }\\n\\n                }', rep)
+          row_end = close + len('\\n                    }')
+          button = '''
                     OutlinedButton(onClick = timer, modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp), colors = ButtonDefaults.outlinedButtonColors(contentColor = Lime)) {
                         Icon(Icons.Default.CheckCircle, null)
                         Spacer(Modifier.width(6.dp))
                         Text(setNo.toString() + " 세트 완료 · 휴식 시작")
-                    }
-                }
-            }
-          }
-          item { Row(horizontalArrangement = Arrangement.spacedBy(10.dp))'''
-          if s.count(anchor) != 1: raise SystemExit('Set completion insertion anchor mismatch: ' + str(s.count(anchor)))
-          s = s.replace(anchor, button, 1)
+                    }'''
+          if '세트 완료 · 휴식 시작' not in s:
+              s = s[:row_end] + button + s[row_end:]
           start = s.index('@Composable private fun RecordsScreen')
           pos = s.index('        item { Column(Modifier.fillMaxWidth().background(Panel, RoundedCornerShape(22.dp))', start)
           coach = r'''        item {
