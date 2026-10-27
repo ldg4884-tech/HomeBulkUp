@@ -609,27 +609,19 @@ jobs:
           }
           '''
           s = s[:pos] + coach + s[pos:]
-          # Add a per-set completion button next to the weight/reps fields.
-          set_row_anchor = '''                        OutlinedTextField(value = setReps, onValueChange = { value ->
-                            setReps = value
-                            logs = logs + (repsKey to value)
-                        }, modifier = Modifier.weight(1f), singleLine = true, label = { Text("횟수", fontSize = 10.sp) }, keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = White, unfocusedTextColor = White, focusedBorderColor = Lime, unfocusedBorderColor = Panel2, focusedLabelColor = Lime, unfocusedLabelColor = Muted))
-                    }'''
-          set_row_new = '''                        OutlinedTextField(value = setReps, onValueChange = { value ->
-                            setReps = value
-                            logs = logs + (repsKey to value)
-                        }, modifier = Modifier.weight(1f), singleLine = true, label = { Text("횟수", fontSize = 10.sp) }, keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = White, unfocusedTextColor = White, focusedBorderColor = Lime, unfocusedBorderColor = Panel2, focusedLabelColor = Lime, unfocusedLabelColor = Muted))
-                        Button(onClick = timer, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp), colors = ButtonDefaults.buttonColors(containerColor = Lime, contentColor = Ink)) { Icon(Icons.Default.Check, null, modifier = Modifier.size(15.dp)); Text("휴식", fontSize = 10.sp) }
-                    }'''
-          if set_row_anchor in s and 'Button(onClick = timer, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)' not in s:
-              s = s.replace(set_row_anchor, set_row_new, 1)
-          elif 'Button(onClick = timer, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)' not in s:
-              raise SystemExit('Could not locate set row for completion shortcut')
+          # Add a per-set rest shortcut by locating the reps field without relying on indentation.
+          if 'Text("휴식", fontSize = 10.sp)' not in s:
+              lines = s.splitlines()
+              target = next((i for i, line in enumerate(lines) if 'OutlinedTextField(value = setReps, onValueChange = { value ->' in line), None)
+              if target is None: raise SystemExit('Could not locate reps field for set shortcut')
+              close = next((i for i in range(target + 1, min(target + 5, len(lines))) if lines[i].strip().endswith('))')), None)
+              if close is None: raise SystemExit('Could not locate end of reps field')
+              lines.insert(close + 1, '                        Button(onClick = timer, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp), colors = ButtonDefaults.buttonColors(containerColor = Lime, contentColor = Ink)) { Icon(Icons.Default.Check, null, modifier = Modifier.size(15.dp)); Text("휴식", fontSize = 10.sp) }')
+              s = '\n'.join(lines) + '\n'
           # The rest timer launched from a set shortcut starts immediately.
           old_timer = '{ showTimer = true; timerRemaining = timer; timerRunning = false }'
           new_timer = '{ showTimer = true; timerRemaining = timer; timerRunning = true }'
-          if old_timer in s:
-              s = s.replace(old_timer, new_timer, 1)
+          if old_timer in s: s = s.replace(old_timer, new_timer, 1)
           p.write_text(s)
           print('Added per-set rest shortcut that opens and starts the rest timer, plus weekly coaching report.')
           PY
