@@ -474,6 +474,96 @@ jobs:
           p.write_text(s)
           print('Added bundled ML Kit image labeling for on-device photo labels; no remote inference API is used.')
           PY
+      - name: Expand nutrition macros, daily goals, and food log controls
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('app/src/main/java/kr/co/homebulkup/MainActivity.kt')
+          s = p.read_text()
+          # Add per-100g carbohydrate/fat estimates, using a local lookup to avoid network calls.
+          anchor = '              val foodProtein = selectedFood.third * grams / 100f'
+          addition = '''              val macroPer100 = when (foodName) {
+                  "흰쌀밥" -> 28.7 to 0.3
+                  "현미밥" -> 25.6 to 1.0
+                  "닭가슴살(조리)" -> 0.0 to 3.6
+                  "계란(삶은 것)" -> 1.1 to 10.6
+                  "두부" -> 1.9 to 4.8
+                  "연어(조리)" -> 0.0 to 12.4
+                  "소고기 살코기(조리)" -> 0.0 to 11.8
+                  "고구마(찐 것)" -> 30.0 to 0.2
+                  "바나나" -> 22.8 to 0.3
+                  "오트밀(마른 것)" -> 66.3 to 6.9
+                  "우유" -> 4.8 to 3.3
+                  "그릭요거트" -> 3.9 to 5.0
+                  "아몬드" -> 21.6 to 49.9
+                  "브로콜리" -> 7.2 to 0.4
+                  "두유(무가당)" -> 1.8 to 1.8
+                  "식빵" -> 49.0 to 3.2
+                  "돼지고기 등심(조리)" -> 0.0 to 8.0
+                  "김치" -> 2.4 to 0.5
+                  else -> 0.0 to 0.0
+              }
+              val foodCarbs = macroPer100.first * grams / 100f
+              val foodFat = macroPer100.second * grams / 100f
+              var calorieGoal by remember { mutableStateOf(photoPrefs.getInt("food_goal_kcal", 2800).toString()) }
+              var proteinGoal by remember { mutableStateOf(photoPrefs.getInt("food_goal_protein", 130).toString()) }
+              fun persistFoodGoals() {
+                  photoPrefs.edit().putInt("food_goal_kcal", calorieGoal.toIntOrNull()?.coerceIn(500, 8000) ?: 2800)
+                      .putInt("food_goal_protein", proteinGoal.toIntOrNull()?.coerceIn(20, 400) ?: 130).apply()
+              }'''
+          if anchor in s and 'val macroPer100 = when (foodName)' not in s:
+              s = s.replace(anchor, anchor + '\n' + addition, 1)
+          save_old = 'foodEntries.put(JSONObject().put("date", todayKey()).put("name", foodName).put("grams", grams.toInt()).put("kcal", foodKcal.toInt()).put("protein", foodProtein.toDouble()))'
+          save_new = 'foodEntries.put(JSONObject().put("date", todayKey()).put("name", foodName).put("grams", grams.toInt()).put("kcal", foodKcal.toInt()).put("protein", foodProtein.toDouble()).put("carbs", foodCarbs.toDouble()).put("fat", foodFat.toDouble()))'
+          if save_old in s: s = s.replace(save_old, save_new, 1)
+          ui_anchor = '                      Button(onClick = { saveFoodEntry() }, enabled = grams > 0f, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Lime, contentColor = Ink))'
+          macro_ui = '''                      Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                          Column(Modifier.weight(1f).background(Panel2, RoundedCornerShape(12.dp)).padding(12.dp)) { Text("탄수화물", color = Muted, fontSize = 11.sp); Text(String.format(Locale.getDefault(), "%.1f g", foodCarbs), color = White, fontWeight = FontWeight.Bold) }
+                          Column(Modifier.weight(1f).background(Panel2, RoundedCornerShape(12.dp)).padding(12.dp)) { Text("지방", color = Muted, fontSize = 11.sp); Text(String.format(Locale.getDefault(), "%.1f g", foodFat), color = White, fontWeight = FontWeight.Bold) }
+                      }
+                      Text("하루 목표 설정", color = White, fontWeight = FontWeight.Bold)
+                      Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                          OutlinedTextField(value = calorieGoal, onValueChange = { calorieGoal = it.filter(Char::isDigit).take(4); persistFoodGoals() }, modifier = Modifier.weight(1f), singleLine = true, label = { Text("kcal 목표") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = White, unfocusedTextColor = White, focusedBorderColor = Lime, unfocusedBorderColor = Panel2))
+                          OutlinedTextField(value = proteinGoal, onValueChange = { proteinGoal = it.filter(Char::isDigit).take(3); persistFoodGoals() }, modifier = Modifier.weight(1f), singleLine = true, label = { Text("단백질 g 목표") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = White, unfocusedTextColor = White, focusedBorderColor = Lime, unfocusedBorderColor = Panel2))
+                      }
+          '''
+          if ui_anchor in s and 'Text("하루 목표 설정"' not in s:
+              s = s.replace(ui_anchor, macro_ui + ui_anchor, 1)
+          today_anchor = '                      Text("오늘 기록 · ${todayFoods.sumOf { it.optInt("kcal") }} kcal · 단백질 ${String.format(Locale.getDefault(), "%.1f", todayFoods.sumOf { it.optDouble("protein") })} g", color = White, fontWeight = FontWeight.Bold)'
+          today_ui = '''                      val todayKcal = todayFoods.sumOf { it.optInt("kcal") }
+                      val todayProtein = todayFoods.sumOf { it.optDouble("protein") }
+                      val todayCarbs = todayFoods.sumOf { it.optDouble("carbs") }
+                      val todayFat = todayFoods.sumOf { it.optDouble("fat") }
+                      val kcalTarget = (calorieGoal.toIntOrNull() ?: 2800).coerceAtLeast(1)
+                      val proteinTarget = (proteinGoal.toIntOrNull() ?: 130).coerceAtLeast(1)
+                      Text("오늘 섭취량", color = White, fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                      Text("$todayKcal / $kcalTarget kcal · 단백질 ${String.format(Locale.getDefault(), "%.1f", todayProtein)} / $proteinTarget g", color = Lime, fontWeight = FontWeight.Bold)
+                      LinearProgressIndicator(progress = { (todayKcal.toFloat() / kcalTarget).coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth(), color = Lime, trackColor = Panel2)
+                      LinearProgressIndicator(progress = { (todayProtein.toFloat() / proteinTarget).coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth(), color = Color(0xFF72A7FF), trackColor = Panel2)
+                      Text("탄수화물 ${String.format(Locale.getDefault(), "%.1f", todayCarbs)} g · 지방 ${String.format(Locale.getDefault(), "%.1f", todayFat)} g", color = Muted, fontSize = 12.sp)
+          '''
+          if today_anchor in s and 'val todayCarbs = todayFoods.sumOf' not in s:
+              s = s.replace(today_anchor, today_ui, 1)
+          old_rows = '                      todayFoods.reversed().take(5).forEach { entry -> Text("${entry.optString("name")} ${entry.optInt("grams")}g · ${entry.optInt("kcal")} kcal", color = Muted, fontSize = 12.sp) }'
+          new_rows = '''                      todayFoods.indices.reversed().take(10).forEach { idx ->
+                          val entry = todayFoods[idx]
+                          Row(Modifier.fillMaxWidth().background(Panel2, RoundedCornerShape(10.dp)).padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                              Column(Modifier.weight(1f)) {
+                                  Text("${entry.optString("name")} ${entry.optInt("grams")}g", color = White, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                  Text("${entry.optInt("kcal")} kcal · P ${String.format(Locale.getDefault(), "%.1f", entry.optDouble("protein"))}g · C ${String.format(Locale.getDefault(), "%.1f", entry.optDouble("carbs"))}g · F ${String.format(Locale.getDefault(), "%.1f", entry.optDouble("fat"))}g", color = Muted, fontSize = 10.sp)
+                              }
+                              TextButton(onClick = {
+                                  val rebuilt = JSONArray()
+                                  for (j in 0 until foodEntries.length()) if (j != idx) rebuilt.put(foodEntries.getJSONObject(j))
+                                  foodEntries = rebuilt
+                                  photoPrefs.edit().putString("food_logs_v1", rebuilt.toString()).apply()
+                              }) { Text("삭제", color = Color(0xFFFF7A7A), fontSize = 11.sp) }
+                          }
+                      }'''
+          if old_rows in s: s = s.replace(old_rows, new_rows, 1)
+          p.write_text(s)
+          print('Expanded nutrition tracking with carbs/fat, saved daily targets, progress bars, and per-entry delete controls.')
+          PY
       - name: Create modern HomeBulkUp launcher icon
         run: |
           mkdir -p app/src/main/res/drawable app/src/main/res/mipmap-anydpi-v26 app/src/main/res/values
