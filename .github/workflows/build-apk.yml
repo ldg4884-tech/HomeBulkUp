@@ -213,6 +213,148 @@ jobs:
           p.write_text(s)
           print('Added exercise guide dialog and clickable exercise titles.')
           PY
+      - name: Add editable workout routines and expanded exercise library
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('app/src/main/java/kr/co/homebulkup/MainActivity.kt')
+          s = p.read_text()
+          marker = '@Composable fun HomeBulkUpApp() {'
+          helpers = r'''
+          private fun loadWorkoutProgram(prefs: android.content.SharedPreferences): List<WorkoutDay> {
+              val raw = prefs.getString("custom_workout_program_v1", null) ?: return program
+              return try {
+                  val arr = JSONArray(raw)
+                  (0 until arr.length()).map { i ->
+                      val d = arr.getJSONObject(i)
+                      val exercises = d.getJSONArray("exercises")
+                      WorkoutDay(d.optString("day"), d.optString("title"), d.optString("subtitle"),
+                          (0 until exercises.length()).map { j ->
+                              val e = exercises.getJSONObject(j)
+                              Exercise(e.optString("name"), e.optString("detail"), e.optInt("sets", 3).coerceIn(1, 10), e.optString("reps", "8–12회"))
+                          })
+                  }.takeIf { it.size == program.size && it.all { d -> d.exercises.isNotEmpty() } } ?: program
+              } catch (_: Exception) { program }
+          }
+
+          private fun saveWorkoutProgram(prefs: android.content.SharedPreferences, days: List<WorkoutDay>) {
+              val arr = JSONArray()
+              days.forEach { day ->
+                  val exercises = JSONArray()
+                  day.exercises.forEach { e -> exercises.put(JSONObject().put("name", e.name).put("detail", e.detail).put("sets", e.sets).put("reps", e.reps)) }
+                  arr.put(JSONObject().put("day", day.day).put("title", day.title).put("subtitle", day.subtitle).put("exercises", exercises))
+              }
+              prefs.edit().putString("custom_workout_program_v1", arr.toString()).apply()
+          }
+
+          private val exerciseCatalog = listOf(
+              Exercise("덤벨 플로어 프레스", "가슴", 3, "8–12회"), Exercise("푸시업", "가슴 · 삼두", 3, "8–15회"),
+              Exercise("덤벨 플라이", "가슴", 3, "10–15회"), Exercise("덤벨 풀오버", "가슴 · 등", 3, "10–15회"),
+              Exercise("인클라인 푸시업", "가슴", 3, "10–15회"), Exercise("디클라인 푸시업", "가슴 · 삼두", 3, "8–12회"),
+              Exercise("원암 덤벨 로우", "등", 3, "10–15회/측"), Exercise("벤트오버 덤벨 로우", "등", 3, "10–15회"),
+              Exercise("문틀 철봉 턱걸이", "등 · 이두", 3, "가능한 만큼"), Exercise("덤벨 풀오버", "등 · 가슴", 3, "10–15회"),
+              Exercise("덤벨 리버스 플라이", "후면 어깨 · 등", 3, "12–20회"), Exercise("슈퍼맨", "허리 · 등", 3, "12–15회"),
+              Exercise("덤벨 숄더 프레스", "어깨", 3, "8–12회"), Exercise("덤벨 레터럴 레이즈", "측면 어깨", 3, "12–20회"),
+              Exercise("덤벨 프런트 레이즈", "전면 어깨", 3, "10–15회"), Exercise("파이크 푸시업", "어깨", 3, "6–12회"),
+              Exercise("덤벨 컬", "이두", 3, "10–15회"), Exercise("해머 컬", "이두 · 전완", 3, "10–15회"),
+              Exercise("컨센트레이션 컬", "이두", 3, "10–12회"), Exercise("리버스 컬", "전완 · 이두", 3, "10–15회"),
+              Exercise("오버헤드 트라이셉스 익스텐션", "삼두", 3, "10–15회"), Exercise("덤벨 킥백", "삼두", 3, "10–15회"),
+              Exercise("클로즈그립 푸시업", "삼두 · 가슴", 3, "8–12회"),
+              Exercise("고블릿 스쿼트", "하체 · 대퇴사두", 3, "10–15회"), Exercise("덤벨 루마니안 데드리프트", "햄스트링 · 둔근", 3, "10–15회"),
+              Exercise("리버스 런지", "하체 · 둔근", 3, "8–12회/측"), Exercise("불가리안 스플릿 스쿼트", "하체", 3, "8–12회/측"),
+              Exercise("글루트 브리지", "둔근", 3, "12–20회"), Exercise("카프 레이즈", "종아리", 3, "15–25회"),
+              Exercise("덤벨 스모 스쿼트", "하체 · 둔근", 3, "10–15회"), Exercise("월싯", "허벅지", 3, "30–60초"),
+              Exercise("플랭크", "코어", 3, "30–60초"), Exercise("사이드 플랭크", "옆구리 · 코어", 3, "20–45초/측"),
+              Exercise("데드버그", "코어", 3, "8–10회/측"), Exercise("바이시클 크런치", "복근", 3, "15–20회"),
+              Exercise("레그 레이즈", "하복부", 3, "10–15회"), Exercise("버드독", "코어 · 허리", 3, "10회/측"),
+              Exercise("마운틴 클라이머", "코어 · 유산소", 3, "30–45초")
+          )
+
+          '''
+          if s.count(marker) != 1: raise SystemExit('HomeBulkUpApp anchor missing')
+          s = s.replace(marker, helpers + marker, 1)
+          old = '    val day = program[selected]'
+          new = '''    var editableProgram by remember { mutableStateOf(loadWorkoutProgram(prefs)) }
+              var showRoutineEditor by remember { mutableStateOf(false) }
+              var showExercisePicker by remember { mutableStateOf(false) }
+              var exerciseSearch by remember { mutableStateOf("") }
+              val day = editableProgram.getOrElse(selected) { editableProgram.first() }
+              LaunchedEffect(editableProgram) { saveWorkoutProgram(prefs, editableProgram) }'''
+          if s.count(old) != 1: raise SystemExit('WorkoutScreen day anchor missing')
+          s = s.replace(old, new, 1)
+          s = s.replace('program.forEachIndexed { i, d -> Column(', 'editableProgram.forEachIndexed { i, d -> Column(', 1)
+          old_summary = '''        item { Column(Modifier.fillMaxWidth().background(Panel, RoundedCornerShape(20.dp)).padding(18.dp)) { Text(day.subtitle, color = Lime, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp); Text(day.title, color = White, fontSize = 22.sp, fontWeight = FontWeight.Bold); Text("${day.exercises.sumOf { it.sets }}세트 · 약 35–45분", color = Muted, fontSize = 12.sp) } }'''
+          new_summary = old_summary + '''
+                  item { OutlinedButton(onClick = { showRoutineEditor = true }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.outlinedButtonColors(contentColor = Lime)) { Icon(Icons.Default.Edit, null); Spacer(Modifier.width(8.dp)); Text("내 루틴 편집 · 운동 추가/삭제/순서/세트") } }'''
+          if s.count(old_summary) != 1: raise SystemExit('Workout summary anchor missing')
+          s = s.replace(old_summary, new_summary, 1)
+          dialog_marker = '    val guideContext = androidx.compose.ui.platform.LocalContext.current'
+          dialog = r'''
+              if (showRoutineEditor) {
+                  AlertDialog(
+                      onDismissRequest = { showRoutineEditor = false },
+                      containerColor = Panel,
+                      title = { Text("루틴 편집", color = White, fontWeight = FontWeight.Bold) },
+                      text = {
+                          Column(Modifier.fillMaxWidth().heightIn(max = 480.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                              Text("운동 순서와 세트 수를 조정하거나 종목을 삭제할 수 있어요.", color = Muted, fontSize = 12.sp)
+                              day.exercises.forEachIndexed { index, ex ->
+                                  Row(Modifier.fillMaxWidth().background(Panel2, RoundedCornerShape(12.dp)).padding(8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                                      Column(Modifier.weight(1f)) {
+                                          Text(ex.name, color = White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                          Text("${ex.detail} · ${ex.reps}", color = Muted, fontSize = 10.sp)
+                                      }
+                                      IconButton(onClick = { if (index > 0) { val list = day.exercises.toMutableList(); val v = list.removeAt(index); list.add(index-1, v); editableProgram = editableProgram.toMutableList().also { it[selected] = day.copy(exercises = list) } } }, enabled = index > 0, modifier = Modifier.size(32.dp)) { Icon(Icons.Default.KeyboardArrowUp, null, tint = if(index > 0) Lime else Muted) }
+                                      IconButton(onClick = { if (index < day.exercises.lastIndex) { val list = day.exercises.toMutableList(); val v = list.removeAt(index); list.add(index+1, v); editableProgram = editableProgram.toMutableList().also { it[selected] = day.copy(exercises = list) } } }, enabled = index < day.exercises.lastIndex, modifier = Modifier.size(32.dp)) { Icon(Icons.Default.KeyboardArrowDown, null, tint = if(index < day.exercises.lastIndex) Lime else Muted) }
+                                      Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                          Text("${ex.sets}", color = Lime, fontWeight = FontWeight.Bold)
+                                          Row {
+                                              IconButton(onClick = { val list = day.exercises.toMutableList(); list[index] = ex.copy(sets = (ex.sets-1).coerceAtLeast(1)); editableProgram = editableProgram.toMutableList().also { it[selected] = day.copy(exercises = list) } }, enabled = ex.sets > 1, modifier = Modifier.size(28.dp)) { Icon(Icons.Default.Remove, null, tint = Lime, modifier = Modifier.size(16.dp)) }
+                                              IconButton(onClick = { val list = day.exercises.toMutableList(); list[index] = ex.copy(sets = (ex.sets+1).coerceAtMost(10)); editableProgram = editableProgram.toMutableList().also { it[selected] = day.copy(exercises = list) } }, enabled = ex.sets < 10, modifier = Modifier.size(28.dp)) { Icon(Icons.Default.Add, null, tint = Lime, modifier = Modifier.size(16.dp)) }
+                                          }
+                                      }
+                                      IconButton(onClick = { if (day.exercises.size > 1) { val list = day.exercises.toMutableList().also { it.removeAt(index) }; editableProgram = editableProgram.toMutableList().also { it[selected] = day.copy(exercises = list) } } }, enabled = day.exercises.size > 1, modifier = Modifier.size(32.dp)) { Icon(Icons.Default.DeleteOutline, null, tint = Orange) }
+                                  }
+                              }
+                              OutlinedButton(onClick = { exerciseSearch = ""; showExercisePicker = true }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.outlinedButtonColors(contentColor = Lime)) { Icon(Icons.Default.Add, null); Spacer(Modifier.width(6.dp)); Text("운동 종목 추가") }
+                          }
+                      },
+                      confirmButton = { TextButton(onClick = { showRoutineEditor = false }) { Text("완료", color = Lime) } },
+                      dismissButton = { TextButton(onClick = { editableProgram = program; showRoutineEditor = false }) { Text("기본 루틴으로 되돌리기", color = Muted) } }
+                  )
+              }
+              if (showExercisePicker) {
+                  AlertDialog(
+                      onDismissRequest = { showExercisePicker = false },
+                      containerColor = Panel,
+                      title = { Text("운동 종목 선택", color = White, fontWeight = FontWeight.Bold) },
+                      text = {
+                          Column(Modifier.fillMaxWidth().heightIn(max = 480.dp)) {
+                              OutlinedTextField(value = exerciseSearch, onValueChange = { exerciseSearch = it }, modifier = Modifier.fillMaxWidth(), singleLine = true, label = { Text("종목 검색") }, colors = OutlinedTextFieldDefaults.colors(focusedTextColor = White, unfocusedTextColor = White, focusedBorderColor = Lime, unfocusedBorderColor = Muted, focusedLabelColor = Lime, unfocusedLabelColor = Muted))
+                              LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                  itemsIndexed(exerciseCatalog.filter { it.name.contains(exerciseSearch, true) || it.detail.contains(exerciseSearch, true) }) { _, ex ->
+                                      Row(Modifier.fillMaxWidth().clickable {
+                                          val list = day.exercises.toMutableList()
+                                          list.add(ex)
+                                          editableProgram = editableProgram.toMutableList().also { it[selected] = day.copy(exercises = list) }
+                                          showExercisePicker = false
+                                      }.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                                          Column(Modifier.weight(1f)) { Text(ex.name, color = White, fontWeight = FontWeight.Medium); Text("${ex.detail} · ${ex.sets}세트 × ${ex.reps}", color = Muted, fontSize = 11.sp) }
+                                          Icon(Icons.Default.AddCircle, null, tint = Lime)
+                                      }
+                                  }
+                              }
+                          }
+                      },
+                      confirmButton = { TextButton(onClick = { showExercisePicker = false }) { Text("닫기", color = Lime) } }
+                  )
+              }
+          '''
+          if s.count(dialog_marker) != 1: raise SystemExit('guide dialog insertion anchor missing')
+          s = s.replace(dialog_marker, dialog + '\n' + dialog_marker, 1)
+          p.write_text(s)
+          print('Added persisted routine editing, exercise picker/search, add/remove, reorder and 1–10 set controls.')
+          PY
       - name: Create modern HomeBulkUp launcher icon
         run: |
           mkdir -p app/src/main/res/drawable app/src/main/res/mipmap-anydpi-v26 app/src/main/res/values
