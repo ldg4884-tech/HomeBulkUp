@@ -137,6 +137,7 @@ jobs:
 
           @Composable private fun RecordsScreen'''
           dialog = '''    }
+              val guideContext = androidx.compose.ui.platform.LocalContext.current
               guideExercise?.let { exercise ->
                   AlertDialog(
                       onDismissRequest = { guideExercise = null },
@@ -175,7 +176,14 @@ jobs:
                           }
                       },
                       confirmButton = {
-                          TextButton(onClick = { guideExercise = null }) { Text("닫기", color = Lime) }
+                          Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                              TextButton(onClick = {
+                                  val query = java.net.URLEncoder.encode(exercise.name + " 운동 자세", "UTF-8")
+                                  val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://www.youtube.com/results?search_query=" + query))
+                                  guideContext.startActivity(intent)
+                              }) { Text("유튜브 자세 영상", color = Lime) }
+                              TextButton(onClick = { guideExercise = null }) { Text("닫기", color = Lime) }
+                          }
                       }
                   )
               }
