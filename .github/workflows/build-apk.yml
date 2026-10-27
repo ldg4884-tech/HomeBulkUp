@@ -117,6 +117,77 @@ jobs:
           p.write_text(s)
           print('Workout exercises now have stable item keys and a shared content type.')
           PY
+      - name: Add exercise form guide dialog with visual cue
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('app/src/main/java/kr/co/homebulkup/MainActivity.kt')
+          s = p.read_text()
+          state_anchor = '    var logs by remember(dateKey) { mutableStateOf(loadExerciseLogs(prefs)) }'
+          if s.count(state_anchor) != 1:
+              raise SystemExit('Could not locate workout log state')
+          s = s.replace(state_anchor, state_anchor + '\n    var guideExercise by remember { mutableStateOf<Exercise?>(null) }', 1)
+          old = '                        Text(exercise.name, color = White, fontWeight = FontWeight.Bold, fontSize = 15.sp)'
+          new = '                        Text(exercise.name, color = White, fontWeight = FontWeight.Bold, fontSize = 15.sp, modifier = Modifier.clickable { guideExercise = exercise })'
+          if s.count(old) != 1:
+              raise SystemExit('Could not find exercise title for guide click')
+          s = s.replace(old, new, 1)
+          end = '''    }
+          }
+
+          @Composable private fun RecordsScreen'''
+          dialog = '''    }
+              guideExercise?.let { exercise ->
+                  AlertDialog(
+                      onDismissRequest = { guideExercise = null },
+                      containerColor = Panel,
+                      title = { Text(exercise.name, color = White, fontWeight = FontWeight.Bold) },
+                      text = {
+                          Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                              Box(
+                                  Modifier.fillMaxWidth().height(120.dp)
+                                      .background(Panel2, RoundedCornerShape(16.dp)),
+                                  contentAlignment = Alignment.Center
+                              ) {
+                                  Icon(Icons.Default.FitnessCenter, contentDescription = "운동 자세 참고 그림", tint = Lime, modifier = Modifier.size(76.dp))
+                              }
+                              Text("운동 자세", color = Lime, fontWeight = FontWeight.Bold)
+                              val n = exercise.name.lowercase()
+                              val steps = when {
+                                  listOf("스쿼트", "런지", "레그", "스텝업").any { n.contains(it) } ->
+                                      listOf("발을 어깨너비 정도로 벌리고 발끝은 자연스럽게 바깥으로 둡니다.", "엉덩이를 뒤로 보내며 무릎을 발끝 방향으로 굽힙니다.", "발바닥 전체로 바닥을 밀어 천천히 일어섭니다.")
+                                  listOf("로우", "풀업", "풀다운", "턱걸이").any { n.contains(it) } ->
+                                      listOf("가슴을 살짝 들고 허리는 중립 자세로 유지합니다.", "어깨를 으쓱하지 말고 팔꿈치를 몸통 쪽으로 당깁니다.", "반동을 쓰지 말고 천천히 시작 자세로 돌아갑니다.")
+                                  listOf("프레스", "푸시업", "푸쉬업", "플라이").any { n.contains(it) } ->
+                                      listOf("견갑을 안정시키고 손목과 팔꿈치를 편안하게 정렬합니다.", "복부에 힘을 주고 무게를 통제하며 밀거나 모읍니다.", "팔꿈치를 과하게 잠그지 말고 천천히 돌아옵니다.")
+                                  listOf("컬", "삼두", "익스텐션", "레이즈").any { n.contains(it) } ->
+                                      listOf("몸통을 흔들지 말고 팔꿈치 위치를 안정적으로 유지합니다.", "목과 어깨에 힘을 빼고 목표 근육으로 천천히 움직입니다.", "반동 없이 시작 자세로 돌아오며 무게를 통제합니다.")
+                                  else ->
+                                      listOf("시작 자세에서 몸통을 안정시키고 관절을 편안하게 정렬합니다.", "반동을 줄이고 운동 범위 전체를 천천히 움직입니다.", "통증이 생기면 중단하고 무게나 동작 범위를 줄입니다.")
+                              }
+                              steps.forEachIndexed { i, step ->
+                                  Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                      Text("${i + 1}.", color = Lime, fontWeight = FontWeight.Bold)
+                                      Text(step, color = White, fontSize = 13.sp)
+                                  }
+                              }
+                              Text("주의: 통증이 생기면 즉시 멈추세요. 위 그림은 참고용 아이콘이며 실제 동작 시범 사진은 아닙니다.", color = Muted, fontSize = 11.sp)
+                          }
+                      },
+                      confirmButton = {
+                          TextButton(onClick = { guideExercise = null }) { Text("닫기", color = Lime) }
+                      }
+                  )
+              }
+          }
+
+          @Composable private fun RecordsScreen'''
+          if s.count(end) != 1:
+              raise SystemExit('Could not find WorkoutScreen end to attach guide dialog')
+          s = s.replace(end, dialog, 1)
+          p.write_text(s)
+          print('Added exercise guide dialog and clickable exercise titles.')
+          PY
       - name: Create modern HomeBulkUp launcher icon
         run: |
           mkdir -p app/src/main/res/drawable app/src/main/res/mipmap-anydpi-v26 app/src/main/res/values
