@@ -384,7 +384,7 @@ jobs:
               }
           '''
           if s.count(marker) != 1: raise SystemExit('NutritionScreen marker not found')
-          if 'var foodPhoto by remember' not in s: s = s.replace(marker, marker + '\\n' + state, 1)
+          if 'var foodPhoto by remember' not in s: s = s.replace(marker, marker + '\n' + state, 1)
           target = '        item { Text("간단한 벌크업 원칙", color = White, fontWeight = FontWeight.Bold, fontSize = 18.sp) }'
           ui = '''
                   item { Column(Modifier.fillMaxWidth().background(Panel, RoundedCornerShape(22.dp)).padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -405,14 +405,14 @@ jobs:
                   } }
           '''
           if s.count(target) != 1: raise SystemExit('Nutrition insertion point not found')
-          if '음식 사진으로 식단 기록' not in s: s = s.replace(target, ui + '\\n' + target, 1)
+          if '음식 사진으로 식단 기록' not in s: s = s.replace(target, ui + '\n' + target, 1)
           if 'if (foodSearchOpen) AlertDialog' not in s:
-              end = '\\n}\n\\n@Composable private fun MacroCard'
+              end = '\n}\n\n@Composable private fun MacroCard'
               dialog = '''
               if (foodSearchOpen) AlertDialog(onDismissRequest = { foodSearchOpen = false }, containerColor = Panel, title = { Text("음식 선택", color = White) }, text = { LazyColumn(Modifier.heightIn(max = 420.dp)) { itemsIndexed(foods) { _, food -> Row(Modifier.fillMaxWidth().clickable { foodName = food.first; foodSearchOpen = false }.padding(10.dp), verticalAlignment = Alignment.CenterVertically) { Column(Modifier.weight(1f)) { Text(food.first, color = White); Text("100g · ${food.second} kcal · 단백질 ${food.third}g", color = Muted, fontSize = 11.sp) }; Icon(Icons.Default.ChevronRight, null, tint = Lime) } } } }, confirmButton = { TextButton(onClick = { foodSearchOpen = false }) { Text("닫기", color = Lime) } })
           '''
               if s.count(end) != 1: raise SystemExit('NutritionScreen end marker not found')
-              s = s.replace(end, '\\n' + dialog + end, 1)
+              s = s.replace(end, '\n' + dialog + end, 1)
           p.write_text(s)
           print('Added photo picker, offline food list, portion-based calorie/protein estimates, and persisted daily food logs.')
           PY
