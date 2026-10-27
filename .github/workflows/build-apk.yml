@@ -295,6 +295,12 @@ jobs:
           packages: "platform-tools"
       - name: Install Android SDK packages
         run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - name: Upload patched source for routine editor implementation
+        uses: actions/upload-artifact@v4
+        with:
+          name: home-bulk-up-patched-source
+          path: app/src/main/java/kr/co/homebulkup/MainActivity.kt
+          retention-days: 2
       - name: Build debug APK
         run: gradle --no-daemon assembleDebug
       - name: Upload APK
