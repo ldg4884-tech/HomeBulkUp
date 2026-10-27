@@ -481,7 +481,7 @@ jobs:
           p = Path('app/src/main/java/kr/co/homebulkup/MainActivity.kt')
           s = p.read_text()
           # Add per-100g carbohydrate/fat estimates, using a local lookup to avoid network calls.
-          anchor = '              val foodProtein = selectedFood.third * grams / 100f'
+          anchor = next((line for line in s.splitlines() if 'val foodProtein = selectedFood.third * grams / 100f' in line), None)
           addition = '''              val macroPer100 = when (foodName) {
                   "흰쌀밥" -> 28.7 to 0.3
                   "현미밥" -> 25.6 to 1.0
@@ -511,8 +511,10 @@ jobs:
                   photoPrefs.edit().putInt("food_goal_kcal", calorieGoal.toIntOrNull()?.coerceIn(500, 8000) ?: 2800)
                       .putInt("food_goal_protein", proteinGoal.toIntOrNull()?.coerceIn(20, 400) ?: 130).apply()
               }'''
-          if anchor in s and 'val macroPer100 = when (foodName)' not in s:
+          if anchor and 'val macroPer100 = when (foodName)' not in s:
               s = s.replace(anchor, anchor + '\n' + addition, 1)
+          elif not anchor and 'val macroPer100 = when (foodName)' not in s:
+              raise SystemExit('Could not locate foodProtein declaration for macro estimates')
           save_old = 'foodEntries.put(JSONObject().put("date", todayKey()).put("name", foodName).put("grams", grams.toInt()).put("kcal", foodKcal.toInt()).put("protein", foodProtein.toDouble()))'
           save_new = 'foodEntries.put(JSONObject().put("date", todayKey()).put("name", foodName).put("grams", grams.toInt()).put("kcal", foodKcal.toInt()).put("protein", foodProtein.toDouble()).put("carbs", foodCarbs.toDouble()).put("fat", foodFat.toDouble()))'
           if save_old in s: s = s.replace(save_old, save_new, 1)
