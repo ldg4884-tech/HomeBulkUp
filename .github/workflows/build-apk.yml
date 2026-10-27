@@ -625,7 +625,7 @@ jobs:
                   Text("※ 저장된 기록을 바탕으로 만든 규칙 기반 안내이며, 기록이 부족하면 분석 정확도가 낮을 수 있어요.", color = Muted, fontSize = 10.sp)
               }
           }
-'''
+          '''
           s = s[:pos] + coach + s[pos:]
           p.write_text(s)
           print('Added set-complete shortcut and weekly coaching report.')
