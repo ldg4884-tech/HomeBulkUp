@@ -23,6 +23,23 @@ jobs:
           unzip -o HomeBulkUp_Project.zip -d /tmp/homebulkup-source
           cp -a /tmp/homebulkup-source/HomeBulkUp/. .
           test -f app/src/main/java/kr/co/homebulkup/MainActivity.kt
+      - name: Inspect routine data model for safe editor patching
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('app/src/main/java/kr/co/homebulkup/MainActivity.kt')
+          lines = p.read_text().splitlines()
+          import re
+          hits = [i for i,line in enumerate(lines) if re.search(r'data class Exercise|data class Day|class Exercise|val .*exercises|WorkoutScreen|val workout|val days', line, re.I)]
+          shown = set()
+          for hit in hits:
+              lo, hi = max(0, hit-3), min(len(lines), hit+9)
+              if any(i in shown for i in range(lo, hi)): continue
+              print(f'--- MainActivity.kt lines {lo+1}-{hi} ---')
+              for i in range(lo, hi):
+                  print(f'{i+1}: {lines[i]}')
+                  shown.add(i)
+          PY
       - name: Add easy-to-reach rest timer after every set
         run: |
           python3 - <<'PY'
