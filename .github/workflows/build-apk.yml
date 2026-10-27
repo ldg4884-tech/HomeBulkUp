@@ -566,6 +566,71 @@ jobs:
           p.write_text(s)
           print('Expanded nutrition tracking with carbs/fat, saved daily targets, progress bars, and per-entry delete controls.')
           PY
+      - name: Add set-complete shortcut and weekly coaching report
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('app/src/main/java/kr/co/homebulkup/MainActivity.kt')
+          s = p.read_text()
+          anchor = '''                    }
+
+                }
+            }
+          }
+          item { Row(horizontalArrangement = Arrangement.spacedBy(10.dp))'''
+          button = '''                    }
+                    OutlinedButton(onClick = timer, modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp), colors = ButtonDefaults.outlinedButtonColors(contentColor = Lime)) {
+                        Icon(Icons.Default.CheckCircle, null)
+                        Spacer(Modifier.width(6.dp))
+                        Text(setNo.toString() + " 세트 완료 · 휴식 시작")
+                    }
+                }
+            }
+          }
+          item { Row(horizontalArrangement = Arrangement.spacedBy(10.dp))'''
+          if s.count(anchor) != 1: raise SystemExit('Set completion insertion anchor mismatch: ' + str(s.count(anchor)))
+          s = s.replace(anchor, button, 1)
+          start = s.index('@Composable private fun RecordsScreen')
+          pos = s.index('        item { Column(Modifier.fillMaxWidth().background(Panel, RoundedCornerShape(22.dp))', start)
+          coach = r'''        item {
+              val context = LocalContext.current
+              val prefs = remember { context.getSharedPreferences("homebulkup", 0) }
+              val recentDays = remember {
+                  val fmt = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+                  val cal = java.util.Calendar.getInstance()
+                  cal.set(java.util.Calendar.HOUR_OF_DAY, 0); cal.set(java.util.Calendar.MINUTE, 0); cal.set(java.util.Calendar.SECOND, 0); cal.set(java.util.Calendar.MILLISECOND, 0)
+                  (0..6).map { offset -> val c = cal.clone() as java.util.Calendar; c.add(java.util.Calendar.DAY_OF_YEAR, -offset); fmt.format(c.time) }.toSet()
+              }
+              val recentWorkoutDays = completed.count { key -> recentDays.any { key.startsWith(it + "-") } }
+              val foodLogs = remember { runCatching { JSONArray(prefs.getString("food_logs_v1", "[]")) }.getOrElse { JSONArray() } }
+              val recentFoodCount = (0 until foodLogs.length()).count { i -> recentDays.contains(foodLogs.optJSONObject(i)?.optString("date")) }
+              val recentWeights = history.filter { recentDays.contains(it.first) }.sortedBy { it.first }
+              val weightDelta = if (recentWeights.size >= 2) recentWeights.last().second - recentWeights.first().second else null
+              val advice = when {
+                  recentWorkoutDays == 0 -> "이번 주 운동 완료 기록이 없어요. 부담 없는 운동 1회부터 기록해 보세요."
+                  recentWorkoutDays < 3 -> "이번 주 운동 기록은 " + recentWorkoutDays + "회예요. 회복을 고려해 다음 주에는 가능한 일정에 운동을 한 번 더 배치해 보세요."
+                  recentFoodCount < 3 -> "운동은 잘 기록하고 있어요. 식단 기록이 적어 섭취량 분석은 아직 제한적이에요. 주요 식사부터 기록해 보세요."
+                  weightDelta != null && weightDelta <= 0f -> "최근 체중 변화가 정체 또는 감소 상태예요. 먼저 식단 기록의 누락 여부와 주간 평균 체중을 확인해 보세요."
+                  else -> "좋아요! 운동과 식단 기록을 이어가세요. 무게나 반복 횟수는 자세와 회복이 안정적일 때 조금씩 높여 보세요."
+              }
+              Column(Modifier.fillMaxWidth().background(Panel, RoundedCornerShape(20.dp)).padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                  Text("WEEKLY COACH", color = Lime, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
+                  Text("이번 주 코칭 리포트", color = White, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+                  Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                      StatCard("운동 기록", recentWorkoutDays.toString() + "일", "최근 7일", Modifier.weight(1f))
+                      StatCard("식단 기록", recentFoodCount.toString() + "건", "최근 7일", Modifier.weight(1f))
+                  }
+                  Text(if (weightDelta == null) "체중 변화: 최근 7일 기록이 더 쌓이면 분석할 수 있어요." else "최근 7일 체중 변화: " + (if (weightDelta >= 0) "+" else "") + String.format(Locale.getDefault(), "%.1f", weightDelta) + "kg", color = if (weightDelta != null && weightDelta > 0) Lime else Muted, fontSize = 12.sp)
+                  Text(advice, color = White, fontSize = 13.sp)
+                  Text("※ 저장된 기록을 바탕으로 만든 규칙 기반 안내이며, 기록이 부족하면 분석 정확도가 낮을 수 있어요.", color = Muted, fontSize = 10.sp)
+              }
+          }
+'''
+          s = s[:pos] + coach + s[pos:]
+          p.write_text(s)
+          print('Added set-complete shortcut and weekly coaching report.')
+          PY
+
       - name: Create modern HomeBulkUp launcher icon
         run: |
           mkdir -p app/src/main/res/drawable app/src/main/res/mipmap-anydpi-v26 app/src/main/res/values
