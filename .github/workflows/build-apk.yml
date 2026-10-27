@@ -622,8 +622,55 @@ jobs:
           old_timer = '{ showTimer = true; timerRemaining = timer; timerRunning = false }'
           new_timer = '{ showTimer = true; timerRemaining = timer; timerRunning = true }'
           if old_timer in s: s = s.replace(old_timer, new_timer, 1)
+          # Add a live workout summary for logged sets and total training volume.
+          workout_anchor = '''    LaunchedEffect(logs, dateKey) {
+        delay(350)
+        saveExerciseLogs(prefs, logs)
+    }
+    LazyColumn'''
+          workout_new = '''    LaunchedEffect(logs, dateKey) {
+        delay(350)
+        saveExerciseLogs(prefs, logs)
+    }
+    val loggedSetCount = (0 until day.exercises.size).sumOf { idx ->
+        (1..day.exercises[idx].sets).count { setNo ->
+            !logs["$dateKey-$selected-$idx-set-$setNo-weight"].isNullOrBlank() &&
+            !logs["$dateKey-$selected-$idx-set-$setNo-reps"].isNullOrBlank()
+        }
+    }
+    val sessionVolumeKg = (0 until day.exercises.size).sumOf { idx ->
+        (1..day.exercises[idx].sets).sumOf { setNo ->
+            val w = logs["$dateKey-$selected-$idx-set-$setNo-weight"]?.toDoubleOrNull() ?: 0.0
+            val r = logs["$dateKey-$selected-$idx-set-$setNo-reps"]?.toDoubleOrNull() ?: 0.0
+            w * r
+        }
+    }
+    LazyColumn'''
+          if workout_anchor in s and 'val sessionVolumeKg =' not in s:
+              s = s.replace(workout_anchor, workout_new, 1)
+          elif 'val sessionVolumeKg =' not in s:
+              raise SystemExit('Could not locate workout summary state anchor')
+          # Insert a compact summary card after the workout day header.
+          if 'Text("오늘 운동 요약"' not in s:
+              lines = s.splitlines()
+              idx = next((i for i, line in enumerate(lines) if 'Text("${day.exercises.sumOf { it.sets }}세트 · 약 35–45분"' in line), None)
+              if idx is None: raise SystemExit('Could not locate workout day summary card')
+              end = next((i for i in range(idx, min(idx + 4, len(lines))) if lines[i].strip() == '}'), None)
+              if end is None: raise SystemExit('Could not locate end of workout day summary item')
+              card = [
+                  '        item { Column(Modifier.fillMaxWidth().background(Panel, RoundedCornerShape(16.dp)).padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {',
+                  '            Text("오늘 운동 요약", color = White, fontWeight = FontWeight.Bold, fontSize = 15.sp)',
+                  '            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {',
+                  '                StatCard("기록한 세트", "$loggedSetCount 세트", "무게·횟수 입력 완료", Modifier.weight(1f))',
+                  '                StatCard("총 볼륨", String.format(Locale.getDefault(), "%,.0f kg", sessionVolumeKg), "무게 × 반복 횟수 합계", Modifier.weight(1f))',
+                  '            }',
+                  '            Text("세트별 무게와 반복 횟수를 입력하면 요약이 자동으로 갱신돼요.", color = Muted, fontSize = 11.sp)',
+                  '        } }'
+              ]
+              lines[end+1:end+1] = card
+              s = '\n'.join(lines) + '\n'
           p.write_text(s)
-          print('Added per-set rest shortcut that opens and starts the rest timer, plus weekly coaching report.')
+          print('Added live set completion shortcut, workout volume summary, and weekly coaching report.')
           PY
 
       - name: Create modern HomeBulkUp launcher icon
