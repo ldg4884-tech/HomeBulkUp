@@ -626,6 +626,57 @@ jobs:
           print('Added live set completion shortcut and weekly coaching report.')
           PY
 
+      - name: Add live workout volume summary
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('app/src/main/java/kr/co/homebulkup/MainActivity.kt')
+          s = p.read_text()
+          anchor = '''    LaunchedEffect(logs, dateKey) {
+          delay(350)
+          saveExerciseLogs(prefs, logs)
+      }
+      LazyColumn'''
+          replacement = '''    LaunchedEffect(logs, dateKey) {
+          delay(350)
+          saveExerciseLogs(prefs, logs)
+      }
+      val loggedSetCount = (0 until day.exercises.size).sumOf { idx ->
+          (1..day.exercises[idx].sets).count { setNo ->
+              !logs["$dateKey-$selected-$idx-set-$setNo-weight"].isNullOrBlank() &&
+              !logs["$dateKey-$selected-$idx-set-$setNo-reps"].isNullOrBlank()
+          }
+      }
+      val sessionVolumeKg = (0 until day.exercises.size).sumOf { idx ->
+          (1..day.exercises[idx].sets).sumOf { setNo ->
+              val w = logs["$dateKey-$selected-$idx-set-$setNo-weight"]?.toDoubleOrNull() ?: 0.0
+              val r = logs["$dateKey-$selected-$idx-set-$setNo-reps"]?.toDoubleOrNull() ?: 0.0
+              w * r
+          }
+      }
+      LazyColumn'''
+          if 'val sessionVolumeKg =' not in s:
+              if anchor not in s:
+                  raise SystemExit('Workout summary state anchor not found')
+              s = s.replace(anchor, replacement, 1)
+          header = '''        item { Column(Modifier.fillMaxWidth().background(Panel, RoundedCornerShape(20.dp)).padding(18.dp)) { Text(day.subtitle, color = Lime, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp); Text(day.title, color = White, fontSize = 22.sp, fontWeight = FontWeight.Bold); Text("${day.exercises.sumOf { it.sets }}세트 · 약 35–45분", color = Muted, fontSize = 12.sp) } }'''
+          card = '''
+        item { Column(Modifier.fillMaxWidth().background(Panel, RoundedCornerShape(16.dp)).padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("오늘 운동 요약", color = White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(Modifier.weight(1f)) { Text("기록한 세트", color = Muted, fontSize = 11.sp); Text("$loggedSetCount 세트", color = Lime, fontSize = 20.sp, fontWeight = FontWeight.Bold) }
+                Column(Modifier.weight(1f)) { Text("총 운동 볼륨", color = Muted, fontSize = 11.sp); Text(String.format(Locale.getDefault(), "%,.0f kg", sessionVolumeKg), color = Lime, fontSize = 20.sp, fontWeight = FontWeight.Bold) }
+            }
+            Text("입력한 무게 × 반복 횟수의 합계입니다.", color = Muted, fontSize = 11.sp)
+        } }'''
+          if 'Text("오늘 운동 요약"' not in s:
+              if header not in s:
+                  raise SystemExit('Workout day heading anchor not found')
+              s = s.replace(header, header + card, 1)
+          p.write_text(s)
+          print('Added live workout set count and training volume summary.')
+          PY
+
       - name: Create modern HomeBulkUp launcher icon
         run: |
           mkdir -p app/src/main/res/drawable app/src/main/res/mipmap-anydpi-v26 app/src/main/res/values
