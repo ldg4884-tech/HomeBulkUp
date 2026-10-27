@@ -355,6 +355,67 @@ jobs:
           p.write_text(s)
           print('Added persisted routine editing, exercise picker/search, add/remove, reorder and 1–10 set controls.')
           PY
+      - name: Add offline food photo and nutrition logging
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('app/src/main/java/kr/co/homebulkup/MainActivity.kt')
+          s = p.read_text()
+          marker = '@Composable private fun NutritionScreen(protein:String, calories:String, onProtein:(String)->Unit, onCalories:(String)->Unit) {'
+          state = '''
+              val context = LocalContext.current
+              val photoPrefs = remember { context.getSharedPreferences("homebulkup", 0) }
+              var foodPhoto by remember { mutableStateOf<Uri?>(null) }
+              var foodName by remember { mutableStateOf("닭가슴살(조리)") }
+              var foodGrams by remember { mutableStateOf("150") }
+              var foodSearchOpen by remember { mutableStateOf(false) }
+              var foodEntries by remember { mutableStateOf(runCatching { JSONArray(photoPrefs.getString("food_logs_v1", "[]")) }.getOrElse { JSONArray() }) }
+              val photoLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { foodPhoto = it }
+              val foods = listOf(Triple("흰쌀밥", 130, 2.4), Triple("현미밥", 123, 2.7), Triple("닭가슴살(조리)", 165, 31.0), Triple("계란(삶은 것)", 155, 13.0), Triple("두부", 76, 8.1), Triple("연어(조리)", 206, 22.0), Triple("소고기 살코기(조리)", 217, 26.0), Triple("고구마(찐 것)", 130, 1.6), Triple("바나나", 89, 1.1), Triple("오트밀(마른 것)", 389, 16.9), Triple("우유", 61, 3.2), Triple("그릭요거트", 97, 9.0), Triple("아몬드", 579, 21.2), Triple("브로콜리", 35, 2.4), Triple("두유(무가당)", 33, 3.3), Triple("식빵", 265, 9.0), Triple("돼지고기 등심(조리)", 196, 27.0), Triple("김치", 15, 1.1))
+              val selectedFood = foods.firstOrNull { it.first == foodName } ?: foods[0]
+              val grams = (foodGrams.toFloatOrNull() ?: 0f).coerceAtLeast(0f)
+              val foodKcal = selectedFood.second * grams / 100f
+              val foodProtein = selectedFood.third * grams / 100f
+              fun saveFoodEntry() {
+                  if (grams <= 0f) return
+                  foodEntries.put(JSONObject().put("date", todayKey()).put("name", foodName).put("grams", grams.toInt()).put("kcal", foodKcal.toInt()).put("protein", foodProtein.toDouble()))
+                  photoPrefs.edit().putString("food_logs_v1", foodEntries.toString()).apply()
+                  foodPhoto = null
+              }
+          '''
+          if s.count(marker) != 1: raise SystemExit('NutritionScreen marker not found')
+          if 'var foodPhoto by remember' not in s: s = s.replace(marker, marker + '\\n' + state, 1)
+          target = '        item { Text("간단한 벌크업 원칙", color = White, fontWeight = FontWeight.Bold, fontSize = 18.sp) }'
+          ui = '''
+                  item { Column(Modifier.fillMaxWidth().background(Panel, RoundedCornerShape(22.dp)).padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                      Text("음식 사진으로 식단 기록", color = White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                      Text(if (foodPhoto == null) "사진을 선택한 뒤 음식 종류와 섭취량을 확인해 주세요." else "사진 선택 완료 · 음식 종류와 양을 확인해 주세요.", color = Muted, fontSize = 12.sp)
+                      Button(onClick = { photoLauncher.launch("image/*") }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Lime, contentColor = Ink)) { Icon(Icons.Default.AddAPhoto, null); Spacer(Modifier.width(8.dp)); Text("음식 사진 선택") }
+                      Text("무료 오프라인 방식: 사진을 AI가 자동 판독하는 기능은 아직 없으며, 아래 음식 선택값으로 영양소를 계산합니다.", color = Muted, fontSize = 11.sp)
+                      OutlinedButton(onClick = { foodSearchOpen = true }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.outlinedButtonColors(contentColor = Lime)) { Text(foodName, modifier = Modifier.weight(1f)); Icon(Icons.Default.ExpandMore, null) }
+                      OutlinedTextField(value = foodGrams, onValueChange = { foodGrams = it.filter(Char::isDigit).take(4) }, modifier = Modifier.fillMaxWidth(), singleLine = true, label = { Text("섭취량 (g)") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = White, unfocusedTextColor = White, focusedBorderColor = Lime, unfocusedBorderColor = Panel2))
+                      Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                          Column(Modifier.weight(1f).background(Panel2, RoundedCornerShape(12.dp)).padding(12.dp)) { Text("열량", color = Muted, fontSize = 11.sp); Text("${foodKcal.toInt()} kcal", color = Lime, fontWeight = FontWeight.Bold, fontSize = 18.sp) }
+                          Column(Modifier.weight(1f).background(Panel2, RoundedCornerShape(12.dp)).padding(12.dp)) { Text("단백질", color = Muted, fontSize = 11.sp); Text("${String.format(Locale.getDefault(), "%.1f", foodProtein)} g", color = Lime, fontWeight = FontWeight.Bold, fontSize = 18.sp) }
+                      }
+                      Button(onClick = { saveFoodEntry() }, enabled = grams > 0f, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Lime, contentColor = Ink)) { Icon(Icons.Default.Add, null); Spacer(Modifier.width(8.dp)); Text("식단 기록 저장") }
+                      val todayFoods = (0 until foodEntries.length()).mapNotNull { i -> runCatching { foodEntries.getJSONObject(i) }.getOrNull() }.filter { it.optString("date") == todayKey() }
+                      Text("오늘 기록 · ${todayFoods.sumOf { it.optInt("kcal") }} kcal · 단백질 ${String.format(Locale.getDefault(), "%.1f", todayFoods.sumOf { it.optDouble("protein") })} g", color = White, fontWeight = FontWeight.Bold)
+                      todayFoods.reversed().take(5).forEach { entry -> Text("${entry.optString("name")} ${entry.optInt("grams")}g · ${entry.optInt("kcal")} kcal", color = Muted, fontSize = 12.sp) }
+                  } }
+          '''
+          if s.count(target) != 1: raise SystemExit('Nutrition insertion point not found')
+          if '음식 사진으로 식단 기록' not in s: s = s.replace(target, ui + '\\n' + target, 1)
+          if 'if (foodSearchOpen) AlertDialog' not in s:
+              end = '\\n}\n\\n@Composable private fun MacroCard'
+              dialog = '''
+              if (foodSearchOpen) AlertDialog(onDismissRequest = { foodSearchOpen = false }, containerColor = Panel, title = { Text("음식 선택", color = White) }, text = { LazyColumn(Modifier.heightIn(max = 420.dp)) { itemsIndexed(foods) { _, food -> Row(Modifier.fillMaxWidth().clickable { foodName = food.first; foodSearchOpen = false }.padding(10.dp), verticalAlignment = Alignment.CenterVertically) { Column(Modifier.weight(1f)) { Text(food.first, color = White); Text("100g · ${food.second} kcal · 단백질 ${food.third}g", color = Muted, fontSize = 11.sp) }; Icon(Icons.Default.ChevronRight, null, tint = Lime) } } } }, confirmButton = { TextButton(onClick = { foodSearchOpen = false }) { Text("닫기", color = Lime) } })
+          '''
+              if s.count(end) != 1: raise SystemExit('NutritionScreen end marker not found')
+              s = s.replace(end, '\\n' + dialog + end, 1)
+          p.write_text(s)
+          print('Added photo picker, offline food list, portion-based calorie/protein estimates, and persisted daily food logs.')
+          PY
       - name: Create modern HomeBulkUp launcher icon
         run: |
           mkdir -p app/src/main/res/drawable app/src/main/res/mipmap-anydpi-v26 app/src/main/res/values
