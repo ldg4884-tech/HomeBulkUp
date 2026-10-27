@@ -416,6 +416,64 @@ jobs:
           p.write_text(s)
           print('Added photo picker, offline food list, portion-based calorie/protein estimates, and persisted daily food logs.')
           PY
+      - name: Add bundled on-device image labeling for food photos
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          gradle_candidates = [Path('app/build.gradle.kts'), Path('app/build.gradle')]
+          gradle = next((p for p in gradle_candidates if p.exists()), None)
+          if gradle is None: raise SystemExit('Could not locate app Gradle file')
+          gs = gradle.read_text()
+          dep = 'implementation("com.google.mlkit:image-labeling:17.0.9")'
+          if 'com.google.mlkit:image-labeling' not in gs:
+              pos = gs.rfind('dependencies {')
+              if pos < 0: raise SystemExit('Could not locate dependencies block')
+              close = gs.find('\n}', pos)
+              if close < 0: raise SystemExit('Could not locate end of dependencies block')
+              gs = gs[:close] + '\n    ' + dep + gs[close:]
+              gradle.write_text(gs)
+          p = Path('app/src/main/java/kr/co/homebulkup/MainActivity.kt')
+          s = p.read_text()
+          imports = [
+              'import com.google.mlkit.vision.common.InputImage',
+              'import com.google.mlkit.vision.label.ImageLabeling',
+              'import com.google.mlkit.vision.label.defaults.ImageLabelerOptions'
+          ]
+          for imp in imports:
+              if imp not in s:
+                  # Place imports before first blank line separating imports from code.
+                  lines = s.splitlines()
+                  last = max((i for i,line in enumerate(lines) if line.startswith('import ')), default=-1)
+                  if last < 0: raise SystemExit('Could not locate Kotlin imports')
+                  lines.insert(last + 1, imp)
+                  s = '\n'.join(lines) + '\n'
+          old = 'val photoLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { foodPhoto = it }'
+          new = '''var imageLabelText by remember { mutableStateOf("사진을 선택하면 기기 내 이미지 인식 결과가 여기에 표시됩니다.") }
+              val photoLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+                  foodPhoto = uri
+                  if (uri == null) { imageLabelText = "사진이 선택되지 않았어요." }
+                  else {
+                      imageLabelText = "사진 분석 중…"
+                      try {
+                          val inputImage = InputImage.fromFilePath(context, uri)
+                          ImageLabeling.getClient(ImageLabelerOptions.DEFAULT_OPTIONS).process(inputImage)
+                              .addOnSuccessListener { labels ->
+                                  imageLabelText = if (labels.isEmpty()) "인식된 항목이 없어요. 음식 종류를 직접 선택해 주세요." else labels.take(5).joinToString(" · ") { "${it.text} ${(it.confidence * 100).toInt()}%" }
+                              }
+                              .addOnFailureListener { imageLabelText = "사진 자동 인식에 실패했어요. 음식 종류를 직접 선택해 주세요." }
+                      } catch (_: Exception) { imageLabelText = "사진을 읽을 수 없어요. 다른 사진을 선택해 주세요." }
+                  }
+              }'''
+          if old in s: s = s.replace(old,new,1)
+          elif 'ImageLabeling.getClient(ImageLabelerOptions.DEFAULT_OPTIONS)' not in s: raise SystemExit('Could not locate photo picker callback')
+          ui_anchor = 'Text("무료 오프라인 방식: 사진을 AI가 자동 판독하는 기능은 아직 없으며, 아래 음식 선택값으로 영양소를 계산합니다.", color = Muted, fontSize = 11.sp)'
+          ui_new = 'Text("기기 내 자동 인식 결과: $imageLabelText", color = Lime, fontSize = 12.sp)\n                      Text("이미지 인식은 일반적인 사물·음식 라벨을 추정합니다. 정확한 음식명과 섭취량은 직접 확인해 주세요.", color = Muted, fontSize = 11.sp)'
+          if ui_anchor in s: s=s.replace(ui_anchor,ui_new,1)
+          elif '기기 내 자동 인식 결과: $imageLabelText' not in s: raise SystemExit('Could not locate food photo helper text')
+          p.write_text(s)
+          print('Added bundled ML Kit image labeling for on-device photo labels; no remote inference API is used.')
+          PY
       - name: Create modern HomeBulkUp launcher icon
         run: |
           mkdir -p app/src/main/res/drawable app/src/main/res/mipmap-anydpi-v26 app/src/main/res/values
